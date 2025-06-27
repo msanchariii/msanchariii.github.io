@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Portfolio - Terminal Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the retro terminal look */
+        body {
+            background-color: #041f03;
+            /* Dark background for overall page */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            /* Small padding around the terminal */
+            box-sizing: border-box;
+            /* Include padding in element's total width and height */
+            overflow: hidden;
+            /* Prevent body scroll if terminal is full height */
+        }
+
+        .terminal-container {
+            background-color: #000000;
+            /* Classic black terminal background */
+            color: #00ff00;
+            /* Bright green text for retro feel */
+            font-family: 'IBM Plex Mono', monospace;
+            /* Cool monospaced font */
+            font-size: 0.9rem;
+            /* Slightly smaller base font size */
+            line-height: 1.4;
+            /* Good line spacing for readability */
+            width: 100%;
+            height: 95vh;
+            /* Almost full viewport height */
+            max-width: 1200px;
+            /* Max width for larger screens */
+            border: 2px solid #00ff00;
+            /* Green border */
+            border-radius: 0.5rem;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
+            /* Green glow effect */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* Ensure content stays within bounds */
+        }
+
+        .terminal-output {
+            flex-grow: 1;
+            /* Allows output to fill available space */
+            padding: 1rem;
+            overflow-y: auto;
+            /* Scroll for long output */
+            white-space: pre-wrap;
+            /* Preserve whitespace and wrap text */
+            word-break: break-word;
+            /* Break long words */
+            scrollbar-width: thin;
+            /* Firefox */
+            scrollbar-color: #00ff00 #333;
+            /* Thumb and track color */
+        }
+
+        /* Webkit scrollbar styles */
+        .terminal-output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal-output::-webkit-scrollbar-track {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        .terminal-output::-webkit-scrollbar-thumb {
+            background-color: #00ff00;
+            border-radius: 4px;
+            border: 2px solid #333;
+        }
+
+        .terminal-input-line {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-top: 1px solid #008000;
+            /* Separator line */
+            background-color: #0d0d0d;
+            /* Slightly different background for input line */
+        }
+
+        .terminal-prompt {
+            color: #00ff00;
+            margin-right: 0.5rem;
+        }
+
+        .terminal-input {
+            background: none;
+            border: none;
+            color: #00ff00;
+            flex-grow: 1;
+            outline: none;
+            /* Remove outline on focus */
+            caret-color: #00ff00;
+            /* Green blinking cursor */
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+        }
+
+        /* Blinking cursor animation */
+        .cursor {
+            display: inline-block;
+            width: 0.6em;
+            /* Width of the cursor */
+            height: 1.2em;
+            /* Height of the cursor, slightly taller than font */
+            background-color: #00ff00;
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+            /* Align with text */
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+
+            from,
+            to {
+                background-color: transparent
+            }
+
+            50% {
+                background-color: #00ff00
+            }
+        }
+
+        .hidden-cursor {
+            visibility: hidden;
+        }
+
+        /* Mobile responsiveness adjustments */
+        @media (max-width: 768px) {
+            .terminal-container {
+                height: 98vh;
+                /* Taller on mobile */
+                border-radius: 0;
+                /* No border radius on small screens */
+                border: none;
+                /* No border on small screens */
+                box-shadow: none;
+                /* No shadow on small screens */
+            }
+
+            .terminal-output,
+            .terminal-input-line {
+                padding: 0.75rem;
+                font-size: 0.85rem;
+            }
+
+            .terminal-input-line {
+                flex-wrap: wrap;
+                /* Allow prompt and input to wrap if needed */
+            }
+
+            .terminal-prompt {
+                margin-bottom: 0.25rem;
+                /* Space if wrapping */
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="terminal-container">
+        <div id="terminalOutput" class="terminal-output"></div>
+        <div class="terminal-input-line">
+            <span class="terminal-prompt">user@portfolio:~$&nbsp;</span>
+            <input type="text" id="terminalInput" class="terminal-input" autofocus spellcheck="false"
+                autocomplete="off">
+            <span id="cursor" class="cursor"></span>
+        </div>
+    </div>
+
+    <script>
+        const terminalOutput = document.getElementById('terminalOutput');
+        const terminalInput = document.getElementById('terminalInput');
+        const cursor = document.getElementById('cursor');
+
+        // Simple file system structure for placeholder data
+        const filesystem = {
+            '~': {
+                type: 'directory',
+                contents: {
+                    'projects': {
+                        type: 'directory',
+                        contents: {
+                            'projectA.md': {
+                                type: 'file',
+                                content: `
+## Project A: Real-time Data Dashboard
+### Description:
+Developed a dynamic dashboard for visualizing live sensor data. Utilized React.js for the frontend, Node.js with Socket.IO for real-time communication, and MongoDB for data storage. Features include interactive charts, data filtering, and user authentication.
+### Technologies:
+- React.js (Hooks, Context API)
+- Node.js / Express
+- Socket.IO
+- MongoDB
+- D3.js (for custom visualizations)
+- Tailwind CSS
+### Link:
+[View Demo](https://example.com/projectA)
+                            `
+                            },
+                            'projectB.md': {
+                                type: 'file',
+                                content: `
+## Project B: E-commerce API
+### Description:
+Built a robust RESTful API for an e-commerce platform. Implemented user authentication (JWT), product management, order processing, and payment gateway integration. Followed a microservices architecture.
+### Technologies:
+- Python (Flask)
+- PostgreSQL
+- Docker
+- AWS (EC2, RDS)
+- Stripe API
+### Link:
+[GitHub Repository](https://github.com/yourusername/projectB)
+                            `
+                            },
+                            'old_snake_game': {
+                                type: 'file',
+                                content: `This is a classic Nokia-style Snake game, built purely with HTML, CSS, and JavaScript. It's a fun little distraction to showcase basic game development skills.`
+                            },
+                            'algorithm_visualizer': {
+                                type: 'file',
+                                content: `An interactive web application that visualizes various sorting algorithms (e.g., Bubble Sort, Quick Sort, Merge Sort) and pathfinding algorithms (Dijkstra's, A*). Users can control speed and input custom data.`
+                            }
+                        }
+                    },
+                    'about_me.md': {
+                        type: 'file',
+                        content: `
+## About Me
+Hello! I'm a passionate Full Stack Developer with a knack for creating intuitive and efficient web applications. I love tackling complex problems and building seamless user experiences. My expertise spans across frontend frameworks like React, backend technologies such as Node.js and Python, and various databases. I'm always eager to learn new technologies and contribute to exciting projects.
+`
+                    },
+                    'contact.md': {
+                        type: 'file',
+                        content: `
+## Contact Information
+- **Email:** your.email@example.com
+- **LinkedIn:** linkedin.com/in/yourprofile
+- **GitHub:** github.com/yourusername
+- **Twitter:** @yourhandle
+`
+                    },
+                    'resume.pdf': {
+                        type: 'file',
+                        content: `Use 'open resume.pdf' or visit [this link](https://example.com/your_resume.pdf) to view my resume.`
+                    }
+                }
+            }
+        };
+
+        let currentPath = '~'; // Keep track of the current directory
+
+        /**
+         * Appends a line of text to the terminal output.
+         * @param {string} text - The text to append.
+         * @param {string} [className=''] - Optional class for styling (e.g., 'error').
+         */
+        function appendOutput(text, className = '') {
+            const line = document.createElement('div');
+            line.textContent = text;
+            if (className) {
+                line.classList.add(className);
+            }
+            terminalOutput.appendChild(line);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight; // Scroll to bottom
+        }
+
+        /**
+         * Clears the terminal output.
+         */
+        function clearOutput() {
+            terminalOutput.innerHTML = '';
+        }
+
+        /**
+         * Simulates a command prompt line before the actual command output.
+         * @param {string} command - The command that was executed.
+         */
+        function appendPromptLine(command) {
+            const promptLine = document.createElement('div');
+            promptLine.innerHTML = `<span class="terminal-prompt">user@portfolio:~$&nbsp;</span><span style="color:#00ff00;">${command}</span>`;
+            terminalOutput.appendChild(promptLine);
+        }
+
+        /**
+         * Gets the current directory object based on currentPath.
+         * @returns {object} The current directory object.
+         */
+        function getCurrentDirectory() {
+            let pathParts = currentPath.split('/').filter(p => p !== '');
+            let currentDir = filesystem;
+            for (const part of pathParts) {
+                if (currentDir[part] && currentDir[part].type === 'directory') {
+                    currentDir = currentDir[part].contents;
+                } else {
+                    // This should ideally not happen if path is managed correctly
+                    console.error("Invalid path part:", part);
+                    return filesystem['~'].contents; // Fallback to root
+                }
+            }
+            return currentDir;
+        }
+
+        /**
+         * Processes the user's command.
+         * @param {string} command - The command entered by the user.
+         */
+        function processCommand(command) {
+            appendPromptLine(command); // Show the command itself in the output
+            const args = command.trim().split(/\s+/);
+            const cmd = args[0];
+            const arg = args[1]; // First argument
+
+            const currentDirContents = getCurrentDirectory();
+
+            switch (cmd) {
+                case 'ls':
+                    handleLs(arg, currentDirContents);
+                    break;
+                case 'cat':
+                    handleCat(arg, currentDirContents);
+                    break;
+                case 'cd':
+                    handleCd(arg);
+                    break;
+                case 'clear':
+                    clearOutput();
+                    break;
+                case 'help':
+                    appendOutput(`
+Available commands:
+  ls [directory]      - List contents of current or specified directory.
+  cat <file>          - Display content of a file.
+  cd <directory>      - Change current directory.
+  clear               - Clear the terminal screen.
+  help                - Display this help message.
+
+Try: ls projects
+Try: cat projects/projectA.md
+`);
+                    break;
+                case 'echo':
+                    appendOutput(args.slice(1).join(' '));
+                    break;
+                case 'date':
+                    appendOutput(new Date().toLocaleString());
+                    break;
+                case 'whoami':
+                    appendOutput('user');
+                    break;
+                case 'neofetch':
+                    appendOutput(`
+             ___
+           .'   '.    user@portfolio
+          /  .-.  \\   --------------
+          |  | |  |   OS: Web Browser
+          \\  \`- '  /   Host: Portfolio Website
+           '.___.'    Kernel: JavaScript
+                        Uptime: ` + formatUptime() + `
+                        Shell: Gemini Terminal
+                        Display: ` + window.innerWidth + `x` + window.innerHeight + `
+                        Font: IBM Plex Mono
+                        Theme: Retro Green
+                            `);
+                    break;
+                case 'open':
+                    if (arg === 'resume.pdf') {
+                        appendOutput('Opening resume...');
+                        window.open('https://example.com/your_resume.pdf', '_blank'); // Replace with actual resume link
+                    } else {
+                        appendOutput(`Error: Cannot open '${arg}'. 'open' command only supports 'resume.pdf'.`);
+                    }
+                    break;
+                default:
+                    appendOutput(`Command not found: ${cmd}.Type 'help' for available commands.`);
+                    break;
+            }
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        /**
+         * Handles the 'ls' command.
+         * @param {string} arg - The directory to list (optional).
+         * @param {object} currentDirContents - Contents of the current directory.
+         */
+        function handleLs(arg, currentDirContents) {
+            let targetDirContents = currentDirContents;
+            let targetPath = currentPath;
+
+            if (arg) {
+                // Handle 'ls projects' or 'ls ~'
+                if (arg === '~') {
+                    targetDirContents = filesystem['~'].contents;
+                    targetPath = '~';
+                } else if (currentDirContents[arg] && currentDirContents[arg].type === 'directory') {
+                    targetDirContents = currentDirContents[arg].contents;
+                    targetPath += '/' + arg;
+                } else {
+                    appendOutput(`ls: cannot access '${arg}': No such file or directory`);
+                    return;
+                }
+            }
+
+            appendOutput(`Contents of ${targetPath}: `);
+            let hasContent = false;
+            for (const item in targetDirContents) {
+                if (targetDirContents.hasOwnProperty(item)) {
+                    hasContent = true;
+                    const typeIndicator = targetDirContents[item].type === 'directory' ? '/' : '';
+                    appendOutput(`  ${item}${typeIndicator} `);
+                }
+            }
+            if (!hasContent) {
+                appendOutput(`  (empty directory)`);
+            }
+        }
+
+        /**
+         * Handles the 'cat' command.
+         * @param {string} arg - The file to display.
+         * @param {object} currentDirContents - Contents of the current directory.
+         */
+        function handleCat(arg, currentDirContents) {
+            if (!arg) {
+                appendOutput('cat: missing operand. Usage: cat <file>');
+                return;
+            }
+
+            let pathParts = arg.split('/');
+            let target = currentDirContents;
+            let found = true;
+
+            for (let i = 0; i < pathParts.length; i++) {
+                const part = pathParts[i];
+                if (target[part]) {
+                    if (i === pathParts.length - 1) { // Last part of the path
+                        if (target[part].type === 'file') {
+                            appendOutput(target[part].content);
+                        } else {
+                            appendOutput(`cat: ${arg}: Is a directory`);
+                        }
+                    } else { // Intermediate part of the path, must be a directory
+                        if (target[part].type === 'directory') {
+                            target = target[part].contents;
+                        } else {
+                            appendOutput(`cat: ${arg}: Not a directory`);
+                            found = false;
+                            break;
+                        }
+                    }
+                } else {
+                    appendOutput(`cat: ${arg}: No such file or directory`);
+                    found = false;
+                    break;
+                }
+            }
+        }
+
+        /**
+         * Handles the 'cd' command.
+         * @param {string} arg - The directory to change to.
+         */
+        function handleCd(arg) {
+            if (!arg) {
+                currentPath = '~'; // Go to root if no argument
+                appendOutput(`cd: changed directory to '${currentPath}'`);
+                return;
+            }
+
+            let newPath = currentPath;
+            if (arg === '..') {
+                const parts = currentPath.split('/');
+                if (parts.length > 1) { // Not at the root already
+                    parts.pop(); // Remove last segment
+                    newPath = parts.join('/') || '~'; // If parts become empty, it's '~'
+                }
+            } else if (arg.startsWith('~')) {
+                newPath = '~';
+                if (arg.length > 1) {
+                    newPath += arg.substring(1); // Append subpath if any
+                }
+            } else {
+                const targetDirContents = getCurrentDirectory();
+                if (targetDirContents[arg] && targetDirContents[arg].type === 'directory') {
+                    newPath = (currentPath === '~') ? `~/${arg}` : `${currentPath}/${arg} `;
+                } else {
+                    appendOutput(`cd: ${arg}: No such file or directory`);
+                    return;
+                }
+            }
+
+            // Verify if the newPath actually exists in our simplified filesystem
+            let tempPathParts = newPath.split('/').filter(p => p !== '');
+            let checkDir = filesystem;
+            let pathValid = true;
+            for (const part of tempPathParts) {
+                if (checkDir[part] && checkDir[part].type === 'directory') {
+                    checkDir = checkDir[part].contents;
+                } else {
+                    pathValid = false;
+                    break;
+                }
+            }
+
+            if (pathValid) {
+                currentPath = newPath;
+                appendOutput(`cd: changed directory to '${currentPath}'`);
+            } else {
+                appendOutput(`cd: ${arg}: No such file or directory`);
+            }
+        }
+
+        /**
+         * Formats uptime for the 'neofetch' command.
+         * This is a placeholder and doesn't actually track uptime across sessions.
+         */
+        function formatUptime() {
+            const seconds = Math.floor(Math.random() * 3600) + 60; // Random seconds for demo
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            return `${hours}h ${minutes % 60}m ${seconds % 60} s`;
+        }
+
+
+        // Event listener for input field
+        terminalInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                const command = terminalInput.value.trim();
+                terminalInput.value = ''; // Clear input
+                if (command) {
+                    processCommand(command);
+                }
+            }
+        });
+
+        // Focus on input when terminal is clicked
+        terminalOutput.addEventListener('click', () => {
+            terminalInput.focus();
+        });
+
+        // Blinking cursor logic
+        terminalInput.addEventListener('focus', () => {
+            cursor.classList.add('hidden-cursor'); // Hide native cursor, rely on input field's cursor
+        });
+
+        terminalInput.addEventListener('blur-sm', () => {
+            cursor.classList.remove('hidden-cursor'); // Show custom cursor when input loses focus
+        });
+
+        // Initial welcome message and instructions
+        function displayWelcome() {
+            appendOutput("Welcome to user@portfolio.com!");
+            appendOutput("This is an interactive terminal version of my portfolio.");
+            appendOutput("Type 'help' to see a list of commands.");
+            appendOutput("");
+            appendOutput("Hint: Try 'ls projects' to view my work.");
+            appendOutput("Hint: Try 'cat about_me.md' to learn more about me.");
+            terminalInput.focus(); // Focus input field on load
+        }
+
+        window.onload = displayWelcome; // Call on window load
+    </script>
+</body>
+
+</html>

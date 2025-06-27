@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux Terminal Simulator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Fira Mono for a beautiful monospace terminal font -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Fira Mono', monospace;
+            background-color: #1a202c;
+            /* Dark charcoal background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            /* Prevent body scroll */
+        }
+
+        .terminal-container {
+            background-color: #2d3748;
+            /* Darker slate gray */
+            border-radius: 0.75rem;
+            /* Rounded corners */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            /* Subtle shadow */
+            width: 90%;
+            max-width: 800px;
+            height: 70vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* Hide scrollbars within container */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            /* Light border */
+        }
+
+        .terminal-header {
+            background-color: #1a202c;
+            /* Even darker header */
+            border-top-left-radius: 0.75rem;
+            border-top-right-radius: 0.75rem;
+            padding: 0.5rem 1rem;
+            color: #a0aec0;
+            /* Light gray text */
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            /* Prevent header from shrinking */
+        }
+
+        .terminal-header .dots {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .terminal-header .dot {
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 9999px;
+            /* Circle */
+        }
+
+        .terminal-header .dot.red {
+            background-color: #ef4444;
+        }
+
+        .terminal-header .dot.yellow {
+            background-color: #fbbf24;
+        }
+
+        .terminal-header .dot.green {
+            background-color: #34d399;
+        }
+
+        .terminal-output {
+            flex-grow: 1;
+            /* Take up remaining space */
+            padding: 1rem;
+            overflow-y: auto;
+            /* Enable scrolling for output */
+            color: #34d399;
+            /* Green text for output */
+            font-size: 1rem;
+            line-height: 1.5;
+            word-wrap: break-word;
+            /* Wrap long lines */
+            white-space: pre-wrap;
+            /* Preserve whitespace and wrap */
+            scrollbar-width: thin;
+            /* Firefox */
+            scrollbar-color: #4a5568 #2d3748;
+            /* Thumb and track color */
+        }
+
+        /* Custom scrollbar for Webkit browsers */
+        .terminal-output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal-output::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+
+        .terminal-output::-webkit-scrollbar-thumb {
+            background-color: #4a5568;
+            border-radius: 4px;
+            border: 2px solid #2d3748;
+        }
+
+        .terminal-input-line {
+            display: flex;
+            padding: 1rem;
+            flex-shrink: 0;
+            /* Prevent input line from shrinking */
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            /* Separator line */
+            background-color: #1a202c;
+            /* Darker background for input area */
+            border-bottom-left-radius: 0.75rem;
+            border-bottom-right-radius: 0.75rem;
+        }
+
+        .terminal-prompt {
+            color: #ecc94b;
+            /* Yellow for prompt */
+            margin-right: 0.5rem;
+            white-space: nowrap;
+            /* Prevent prompt from wrapping */
+        }
+
+        .terminal-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #34d399;
+            /* Green text for input */
+            flex-grow: 1;
+            /* Take up remaining space */
+            caret-color: #34d399;
+            /* Blinking cursor color */
+            font-size: 1rem;
+        }
+
+        /* Blinking cursor animation for aesthetic */
+        .terminal-input:focus {
+            outline: none;
+            /* Remove default focus outline */
+        }
+
+        .terminal-input::after {
+            content: '_';
+            color: #34d399;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        .file {
+            color: #a0aec0;
+        }
+
+        /* Light gray for files */
+        .directory {
+            color: #63b3ed;
+        }
+
+        /* Light blue for directories */
+        .error {
+            color: #f56565;
+        }
+
+        /* Red for errors */
+        .info {
+            color: #cbd5e0;
+        }
+
+        /* Off-white for general info/help */
+        .welcome {
+            color: #c084fc;
+        }
+
+        /* Purple for welcome message */
+    </style>
+</head>
+
+<body>
+
+    <div class="terminal-container" id="terminal">
+        <div class="terminal-header">
+            <div class="dots">
+                <div class="dot red"></div>
+                <div class="dot yellow"></div>
+                <div class="dot green"></div>
+            </div>
+            <span>user@sim-linux: ~</span>
+            <span>X</span>
+        </div>
+        <div class="terminal-output" id="terminalOutput">
+            <!-- Output will be appended here by JavaScript -->
+        </div>
+        <div class="terminal-input-line">
+            <span id="terminalPrompt" class="terminal-prompt">user@sim-linux:~$</span>
+            <input type="text" id="terminalInput" class="terminal-input" autofocus autocomplete="off"
+                spellcheck="false">
+        </div>
+    </div>
+
+    <script>
+        // --- Virtual File System Data Structure ---
+        // Represents the directory and file structure.
+        // Each object has a 'name', 'type' ('file' or 'directory'),
+        // and 'children' (for directories) or 'content' (for files).
+        const fileSystem = {
+            name: "/",
+            type: "directory",
+            children: [
+                {
+                    name: "home",
+                    type: "directory",
+                    children: [
+                        {
+                            name: "user",
+                            type: "directory",
+                            children: [
+                                { name: "documents", type: "directory", children: [] },
+                                { name: "pictures", type: "directory", children: [] },
+                                { name: "my_notes.txt", type: "file", content: "This is a sample note file.\nYou can read it with 'cat my_notes.txt'." },
+                                { name: "secret.txt", type: "file", content: "The password is 'banana'. Just kidding!" }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "bin",
+                    type: "directory",
+                    children: [
+                        { name: "ls", type: "file", content: "Simulated 'ls' executable" },
+                        { name: "cat", type: "file", content: "Simulated 'cat' executable" },
+                        { name: "echo", type: "file", content: "Simulated 'echo' executable" }
+                    ]
+                },
+                {
+                    name: "etc",
+                    type: "directory",
+                    children: [
+                        { name: "hosts", type: "file", content: "127.0.0.1 localhost" },
+                        { name: "motd", type: "file", content: "Welcome to the Sim-Linux Terminal!" }
+                    ]
+                },
+                { name: "README.md", type: "file", content: "Welcome to the Sim-Linux Terminal!\nType 'help' to see available commands." }
+            ]
+        };
+
+        // --- Global Variables ---
+        const terminalOutput = document.getElementById('terminalOutput');
+        const terminalInput = document.getElementById('terminalInput');
+        const terminalPrompt = document.getElementById('terminalPrompt');
+        let currentDirectory = fileSystem.children.find(dir => dir.name === "home")
+            .children.find(dir => dir.name === "user"); // Start in /home/user
+        let currentPath = "/home/user";
+        let commandHistory = [];
+        let historyIndex = -1; // -1 means no history command is currently selected
+
+        // --- Utility Functions ---
+
+        /**
+         * Appends a message to the terminal output.
+         * @param {string} message The message to display.
+         * @param {string} type CSS class for styling (e.g., 'error', 'info', 'welcome').
+         */
+        function appendOutput(message, type = '') {
+            const line = document.createElement('div');
+            // FIX: Use innerHTML instead of textContent to render HTML strings
+            line.innerHTML = message;
+            if (type) {
+                line.classList.add(type);
+            }
+            terminalOutput.appendChild(line);
+            // Scroll to the bottom
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        /**
+         * Updates the terminal prompt to reflect the current path.
+         */
+        function updatePrompt() {
+            terminalPrompt.textContent = `user@sim-linux:${currentPath === '/home/user' ? '~' : currentPath}$ `;
+        }
+
+        /**
+         * Finds a node (file or directory) within the file system based on a path.
+         * @param {string} path The absolute or relative path to the node.
+         * @param {object} startNode The node to start the search from (defaults to fileSystem root).
+         * @returns {object|null} The found node or null if not found.
+         */
+        function findNode(path, startNode = fileSystem) {
+            if (!path || path === '.') {
+                return startNode;
+            }
+            // Handle absolute paths
+            let current = startNode;
+            if (path.startsWith('/')) {
+                current = fileSystem; // Start from root for absolute paths
+                path = path.substring(1);
+            }
+
+            const pathParts = path.split('/').filter(part => part !== '');
+
+            for (const part of pathParts) {
+                if (part === '..') {
+                    // Navigate up to parent. For simplicity, we don't have explicit parent pointers
+                    // so we'll just track the path string.
+                    // A proper implementation would need a parent property on each node.
+                    // For this simple findNode, it just means you can't navigate '..' within findNode itself
+                    // unless you are traversing the path.
+                    // This function is mainly for resolving full paths relative to a starting point or root.
+                    // 'cd ..' is handled directly in the cd command.
+                    return null; // findNode doesn't support '..' for path resolution directly
+                }
+                const nextNode = current.children ? current.children.find(child => child.name === part) : null;
+                if (nextNode && nextNode.type === 'directory') {
+                    current = nextNode;
+                } else {
+                    return null; // Path part not found or not a directory
+                }
+            }
+            return current;
+        }
+
+        /**
+         * Resolves a path (relative or absolute) to an actual file system node.
+         * @param {string} path The path to resolve.
+         * @returns {object|null} The resolved node or null if not found.
+         */
+        function resolvePath(path) {
+            if (path.startsWith('/')) {
+                // Absolute path
+                return findNode(path);
+            } else if (path === '.' || path === '') {
+                // Current directory
+                return currentDirectory;
+            } else if (path === '..') {
+                // Parent directory
+                if (currentDirectory.name === '/') {
+                    return fileSystem; // Parent of root is root
+                }
+                // To find parent without explicit parent pointers, we traverse from root
+                // This is inefficient but simple for this demo.
+                let tempPathParts = currentPath.split('/').filter(p => p !== '');
+                if (tempPathParts.length === 0) return fileSystem; // Already at root
+
+                tempPathParts.pop(); // Remove current directory from path
+                const parentPath = '/' + tempPathParts.join('/');
+                if (parentPath === '/') return fileSystem; // Handle case where parent is root
+                return findNode(parentPath);
+
+            } else {
+                // Relative path
+                return currentDirectory.children.find(child => child.name === path);
+            }
+        }
+
+        /**
+         * Gets the directory object corresponding to a given path.
+         * Useful for commands like mkdir, touch, rm which need to modify children.
+         * @param {string} path The path to the directory.
+         * @returns {object|null} The directory object or null if not found/not a directory.
+         */
+        function getDirectory(path) {
+            const node = resolvePath(path);
+            return (node && node.type === 'directory') ? node : null;
+        }
+
+        /**
+         * Get the name of the current directory.
+         * @param {string} fullPath The full path string.
+         * @returns {string} The name of the last segment in the path.
+         */
+        function getDirName(fullPath) {
+            const parts = fullPath.split('/').filter(p => p !== '');
+            return parts.length > 0 ? parts[parts.length - 1] : '/';
+        }
+
+        /**
+         * Get the parent path of a given full path.
+         * @param {string} fullPath The full path string.
+         * @returns {string} The parent path.
+         */
+        function getParentPath(fullPath) {
+            const parts = fullPath.split('/').filter(p => p !== '');
+            if (parts.length <= 1) {
+                return '/';
+            }
+            parts.pop(); // Remove current directory
+            return '/' + parts.join('/');
+        }
+
+
+        // --- Command Implementations ---
+
+        const commands = {
+            /**
+             * Lists contents of the current or specified directory.
+             * @param {string[]} args Command arguments.
+             */
+            ls: function (args) {
+                let targetDir = currentDirectory;
+                let listPath = currentPath;
+
+                if (args.length > 0) {
+                    const resolvedNode = resolvePath(args[0]);
+                    if (!resolvedNode) {
+                        appendOutput(`ls: cannot access '${args[0]}': No such file or directory`, 'error');
+                        return;
+                    }
+                    if (resolvedNode.type === 'file') {
+                        appendOutput(resolvedNode.name, 'file'); // ls on a file just prints its name
+                        return;
+                    }
+                    targetDir = resolvedNode;
+                    // If targetDir is root, path is '/', otherwise it's its own name
+                    listPath = args[0].startsWith('/') ? args[0] : (currentPath === '/' ? '/' + args[0] : currentPath + '/' + args[0]);
+                }
+
+                if (targetDir.children.length === 0) {
+                    appendOutput(`(empty directory)`, 'info');
+                    return;
+                }
+
+                targetDir.children.forEach(item => {
+                    const name = item.type === 'directory' ? `<span class="directory">${item.name}/</span>` : `<span class="file">${item.name}</span>`;
+                    terminalOutput.innerHTML += name + ' ';
+                });
+                terminalOutput.innerHTML += '<br>'; // Add a newline after listing
+            },
+
+            /**
+             * Changes the current directory.
+             * @param {string[]} args Command arguments.
+             */
+            cd: function (args) {
+                if (args.length === 0 || args[0] === '~') {
+                    // cd or cd ~ goes to /home/user
+                    currentDirectory = fileSystem.children.find(dir => dir.name === "home")
+                        .children.find(dir => dir.name === "user");
+                    currentPath = "/home/user";
+                    updatePrompt();
+                    return;
+                }
+
+                const targetPath = args[0];
+                let newDirectory = null;
+
+                if (targetPath.startsWith('/')) {
+                    // Absolute path
+                    newDirectory = getDirectory(targetPath);
+                } else if (targetPath === '..') {
+                    // Go up one level
+                    if (currentDirectory.name === '/') {
+                        newDirectory = fileSystem; // Already at root, stay at root
+                    } else {
+                        // Reconstruct parent path
+                        let tempPathParts = currentPath.split('/').filter(p => p !== '');
+                        tempPathParts.pop(); // Remove current dir
+                        let parentPath = '/' + tempPathParts.join('/');
+                        if (parentPath === '') parentPath = '/'; // If it's empty, means we go to root
+                        newDirectory = getDirectory(parentPath);
+                    }
+                } else if (targetPath === '.') {
+                    // Stay in current directory
+                    newDirectory = currentDirectory;
+                } else {
+                    // Relative path
+                    newDirectory = currentDirectory.children.find(item => item.name === targetPath && item.type === 'directory');
+                }
+
+                if (newDirectory && newDirectory.type === 'directory') {
+                    currentDirectory = newDirectory;
+                    // Update currentPath string based on new directory
+                    if (targetPath === '..') {
+                        let pathParts = currentPath.split('/').filter(p => p !== '');
+                        if (pathParts.length > 0) {
+                            pathParts.pop();
+                            currentPath = '/' + pathParts.join('/');
+                            if (currentPath === '') currentPath = '/';
+                        } else {
+                            currentPath = '/'; // Already at root
+                        }
+                    } else if (targetPath.startsWith('/')) {
+                        currentPath = targetPath;
+                    } else if (targetPath === '.') {
+                        // Path remains the same
+                    } else {
+                        currentPath = (currentPath === '/') ? `/${targetPath}` : `${currentPath}/${targetPath}`;
+                    }
+                } else {
+                    appendOutput(`cd: ${args[0]}: No such file or directory or not a directory`, 'error');
+                }
+                updatePrompt();
+            },
+
+            /**
+             * Prints the current working directory.
+             * @param {string[]} args Command arguments (ignored).
+             */
+            pwd: function (args) {
+                appendOutput(currentPath, 'info');
+            },
+
+            /**
+             * Displays content of a file.
+             * @param {string[]} args Command arguments (filename).
+             */
+            cat: function (args) {
+                if (args.length === 0) {
+                    appendOutput('cat: missing operand', 'error');
+                    appendOutput('Try \'cat --help\' for more information.', 'info');
+                    return;
+                }
+                const filename = args[0];
+                const file = currentDirectory.children.find(item => item.name === filename);
+
+                if (file) {
+                    if (file.type === 'file') {
+                        appendOutput(file.content);
+                    } else {
+                        appendOutput(`cat: ${filename}: Is a directory`, 'error');
+                    }
+                } else {
+                    appendOutput(`cat: ${filename}: No such file or directory`, 'error');
+                }
+            },
+
+            /**
+             * Prints arguments to the terminal.
+             * @param {string[]} args Command arguments.
+             */
+            echo: function (args) {
+                appendOutput(args.join(' '));
+            },
+
+            /**
+             * Clears the terminal screen.
+             * @param {string[]} args Command arguments (ignored).
+             */
+            clear: function (args) {
+                terminalOutput.innerHTML = '';
+            },
+
+            /**
+             * Displays a list of available commands.
+             * @param {string[]} args Command arguments (ignored).
+             */
+            help: function (args) {
+                appendOutput('Available commands:', 'info');
+                appendOutput('- ls [directory]: List directory contents', 'info');
+                appendOutput('- cd [directory]: Change directory', 'info');
+                appendOutput('- pwd: Print working directory', 'info');
+                appendOutput('- cat [file]: Display file content', 'info');
+                appendOutput('- echo [text]: Print text to the terminal', 'info');
+                appendOutput('- clear: Clear the terminal screen', 'info');
+                appendOutput('- mkdir [directory]: Create a new directory', 'info');
+                appendOutput('- rm [file/directory]: Remove a file or empty directory', 'info');
+                appendOutput('- touch [file]: Create an empty file', 'info');
+                appendOutput('- whoami: Display current user', 'info');
+                appendOutput('- date: Display current date and time', 'info');
+                appendOutput('- help: Show this help message', 'info');
+            },
+
+            /**
+             * Creates a new directory.
+             * @param {string[]} args Command arguments (directory name).
+             */
+            mkdir: function (args) {
+                if (args.length === 0) {
+                    appendOutput('mkdir: missing operand', 'error');
+                    appendOutput('Try \'mkdir --help\' for more information.', 'info');
+                    return;
+                }
+                const newDirName = args[0];
+                if (currentDirectory.children.some(item => item.name === newDirName)) {
+                    appendOutput(`mkdir: cannot create directory '${newDirName}': File exists`, 'error');
+                    return;
+                }
+                currentDirectory.children.push({
+                    name: newDirName,
+                    type: "directory",
+                    children: []
+                });
+                appendOutput(''); // Just a newline for success
+            },
+
+            /**
+             * Removes a file or empty directory.
+             * @param {string[]} args Command arguments (item name).
+             */
+            rm: function (args) {
+                if (args.length === 0) {
+                    appendOutput('rm: missing operand', 'error');
+                    appendOutput('Try \'rm --help\' for more information.', 'info');
+                    return;
+                }
+                const itemName = args[0];
+                const index = currentDirectory.children.findIndex(item => item.name === itemName);
+
+                if (index === -1) {
+                    appendOutput(`rm: cannot remove '${itemName}': No such file or directory`, 'error');
+                    return;
+                }
+
+                const itemToRemove = currentDirectory.children[index];
+                if (itemToRemove.type === 'directory' && itemToRemove.children.length > 0) {
+                    appendOutput(`rm: cannot remove '${itemName}': Directory not empty`, 'error');
+                    return;
+                }
+
+                currentDirectory.children.splice(index, 1);
+                appendOutput(''); // Just a newline for success
+            },
+
+            /**
+             * Creates an empty file.
+             * @param {string[]} args Command arguments (filename).
+             */
+            touch: function (args) {
+                if (args.length === 0) {
+                    appendOutput('touch: missing file operand', 'error');
+                    appendOutput('Try \'touch --help\' for more information.', 'info');
+                    return;
+                }
+                const newFileName = args[0];
+                if (currentDirectory.children.some(item => item.name === newFileName)) {
+                    // If file exists, 'touch' usually just updates timestamp. Here, we just do nothing.
+                    return;
+                }
+                currentDirectory.children.push({
+                    name: newFileName,
+                    type: "file",
+                    content: ""
+                });
+                appendOutput(''); // Just a newline for success
+            },
+
+            /**
+             * Displays the current user name.
+             * @param {string[]} args Command arguments (ignored).
+             */
+            whoami: function (args) {
+                appendOutput('user');
+            },
+
+            /**
+             * Displays the current date and time.
+             * @param {string[]} args Command arguments (ignored).
+             */
+            date: function (args) {
+                appendOutput(new Date().toString());
+            }
+        };
+
+        // --- Event Handlers ---
+
+        /**
+         * Handles command execution when Enter key is pressed.
+         * @param {KeyboardEvent} event
+         */
+        function handleCommand(event) {
+            if (event.key === 'Enter') {
+                const commandLine = terminalInput.value.trim();
+                terminalInput.value = ''; // Clear input field
+
+                if (commandLine === '') {
+                    appendOutput(`${terminalPrompt.textContent}`); // Just show prompt if empty
+                    return;
+                }
+
+                appendOutput(`${terminalPrompt.textContent}${commandLine}`); // Echo the command
+
+                // Add to history
+                if (commandLine !== commandHistory[commandHistory.length - 1]) {
+                    commandHistory.push(commandLine);
+                }
+                historyIndex = commandHistory.length; // Reset history index
+
+                const parts = commandLine.split(/\s+/); // Split by one or more spaces
+                const command = parts[0];
+                const args = parts.slice(1);
+
+                if (commands[command]) {
+                    commands[command](args);
+                } else {
+                    appendOutput(`${command}: command not found`, 'error');
+                }
+                terminalOutput.scrollTop = terminalOutput.scrollHeight; // Ensure scroll to bottom
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault(); // Prevent cursor from moving to start of input
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    terminalInput.value = commandHistory[historyIndex];
+                }
+            } else if (event.key === 'ArrowDown') {
+                event.preventDefault(); // Prevent cursor from moving to end of input
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    terminalInput.value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = commandHistory.length;
+                    terminalInput.value = ''; // Clear input if at end of history
+                }
+            }
+        }
+
+        // --- Initialization ---
+
+        window.onload = function () {
+            appendOutput('<span class="welcome">Welcome to Sim-Linux Terminal!</span>', 'welcome');
+            appendOutput('<span class="info">Type \'help\' to get started.</span>', 'info');
+            appendOutput(''); // Add a newline for spacing
+            updatePrompt(); // Set initial prompt
+            terminalInput.focus(); // Focus input on load
+
+            // Click anywhere on terminal to re-focus input
+            document.getElementById('terminal').addEventListener('click', () => {
+                terminalInput.focus();
+            });
+
+            // Prevent unwanted behavior (e.g., Tab moving focus away from input)
+            terminalInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Tab') {
+                    e.preventDefault(); // Prevent default tab behavior
+                    // Optional: Implement autocompletion here
+                    // This is more complex and would involve looking at current input
+                    // and matching against available commands/files in currentDirectory.
+                }
+            });
+        };
+
+        // Add event listener for input
+        terminalInput.addEventListener('keydown', handleCommand);
+    </script>
+</body>
+
+</html>

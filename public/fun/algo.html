@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorting Algorithm Visualizer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles to ensure full height and smooth transitions */
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: "Inter", sans-serif; /* Using Inter font as requested */
+            overflow: hidden; /* Prevent scrolling if bars are too tall */
+        }
+        .array-bar {
+            background-color: #3b82f6; /* Blue-500 */
+            width: 1%; /* Initial width, will be adjusted by JS based on array size */
+            margin: 0 1px; /* Small margin between bars */
+            transition: height 0.1s ease, background-color 0.1s ease; /* Smooth transition for height and color */
+        }
+        .highlight {
+            background-color: #ef4444; /* Red-500 */
+        }
+        .sorted {
+            background-color: #22c55e; /* Green-500 */
+        }
+        /* Flexbox for centering content */
+        .flex-center {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col h-full">
+    <div class="container mx-auto p-4 flex flex-col grow">
+        <!-- Header -->
+        <h1 class="text-3xl font-bold text-center mb-6 text-indigo-400">Sorting Algorithm Visualizer</h1>
+
+        <!-- Controls -->
+        <div class="flex flex-wrap justify-center items-center gap-4 mb-6 p-4 bg-gray-800 rounded-lg shadow-lg">
+            <!-- Array Size Slider -->
+            <div class="flex flex-col items-center">
+                <label for="arraySize" class="text-sm text-gray-300 mb-1">Array Size: <span id="arraySizeValue">50</span></label>
+                <input type="range" id="arraySize" min="10" max="200" value="50" class="w-48 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-lg accent-indigo-500">
+            </div>
+
+            <!-- Sorting Speed Slider -->
+            <div class="flex flex-col items-center">
+                <label for="sortSpeed" class="text-sm text-gray-300 mb-1">Speed: <span id="sortSpeedValue">100</span>ms</label>
+                <input type="range" id="sortSpeed" min="10" max="500" value="100" class="w-48 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-lg accent-indigo-500">
+            </div>
+
+            <!-- Algorithm Selector -->
+            <div class="flex flex-col items-center">
+                <label for="algorithmSelect" class="text-sm text-gray-300 mb-1">Algorithm:</label>
+                <select id="algorithmSelect" class="bg-gray-700 text-white p-2 rounded-md focus:outline-hidden focus:ring-2 focus:ring-indigo-500">
+                    <option value="bubbleSort">Bubble Sort</option>
+                    <option value="selectionSort">Selection Sort</option>
+                    <option value="insertionSort">Insertion Sort</option>
+                    <option value="mergeSort">Merge Sort</option>
+                    <option value="quickSort">Quick Sort</option>
+                </select>
+            </div>
+
+            <!-- Buttons -->
+            <button id="generateArray" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                Generate New Array
+            </button>
+            <button id="startSort" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                Start Sort
+            </button>
+            <button id="stopSort" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800" disabled>
+                Stop Sort
+            </button>
+        </div>
+
+        <!-- Visualization Area -->
+        <div id="visualizationArea" class="grow flex justify-center items-end p-4 bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-700">
+            <!-- Array bars will be rendered here by JavaScript -->
+        </div>
+    </div>
+
+    <script type="module">
+        // Get DOM elements
+        const visualizationArea = document.getElementById('visualizationArea');
+        const generateArrayBtn = document.getElementById('generateArray');
+        const startSortBtn = document.getElementById('startSort');
+        const stopSortBtn = document.getElementById('stopSort'); // New stop button
+        const algorithmSelect = document.getElementById('algorithmSelect');
+        const arraySizeSlider = document.getElementById('arraySize');
+        const arraySizeValueSpan = document.getElementById('arraySizeValue');
+        const sortSpeedSlider = document.getElementById('sortSpeed');
+        const sortSpeedValueSpan = document.getElementById('sortSpeedValue');
+
+        let array = [];
+        let arraySize = parseInt(arraySizeSlider.value);
+        let sortSpeed = parseInt(sortSpeedSlider.value);
+        let isSorting = false; // Flag to prevent multiple sorts at once
+        let stopRequested = false; // New flag to stop sorting
+
+        // --- Helper Functions ---
+
+        /**
+         * Pauses execution for a specified duration, used for animation speed.
+         * @param {number} ms - The number of milliseconds to pause.
+         * @returns {Promise<void>} A promise that resolves after the specified time.
+         */
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        /**
+         * Generates a new random array of a specified size.
+         * Values range from 5 to 100.
+         */
+        function generateNewArray() {
+            if (isSorting) return; // Prevent generating array while sorting
+            array = [];
+            for (let i = 0; i < arraySize; i++) {
+                // Generate values between 5 and 100 for better visualization
+                array.push(Math.floor(Math.random() * 96) + 5);
+            }
+            renderArray();
+        }
+
+        /**
+         * Renders the current state of the array as vertical bars.
+         * Each bar's height represents its value.
+         */
+        function renderArray() {
+            visualizationArea.innerHTML = ''; // Clear previous bars
+            const barWidthPercentage = 100 / arraySize; // Calculate dynamic width for bars
+
+            array.forEach((value, index) => {
+                const bar = document.createElement('div');
+                bar.classList.add('array-bar', 'rounded-md', 'shadow-xs'); // Add rounded corners and shadow
+                bar.style.height = `${value * 0.8}%`; // Scale height relative to visualization area
+                bar.style.width = `${barWidthPercentage - 0.2}%`; // Adjust width with a small gap
+                visualizationArea.appendChild(bar);
+            });
+        }
+
+        /**
+         * Updates the visual representation of two bars being compared or swapped.
+         * @param {number[]} indices - An array of indices to highlight.
+         * @param {string} type - 'compare', 'swap', 'sorted', 'reset', 'pivot'.
+         */
+        async function updateBars(indices, type) {
+            // If stop requested, immediately return
+            if (stopRequested) {
+                throw new Error("Sorting stopped by user.");
+            }
+
+            const bars = visualizationArea.children;
+            // Reset colors of all bars first
+            for (let i = 0; i < bars.length; i++) {
+                bars[i].classList.remove('highlight', 'sorted', 'bg-yellow-400'); // Remove all specific colors
+                bars[i].style.backgroundColor = ''; // Reset to default Tailwind blue
+            }
+
+            if (type === 'compare' || type === 'swap') {
+                indices.forEach(index => {
+                    if (bars[index]) bars[index].classList.add('highlight'); // Use red for comparison/swap
+                });
+            } else if (type === 'sorted') {
+                indices.forEach(index => {
+                    if (bars[index]) bars[index].classList.add('sorted'); // Use green for sorted elements
+                });
+            } else if (type === 'reset') {
+                // No specific action needed here as colors were already reset above
+            } else if (type === 'pivot') {
+                if (bars[indices[0]]) bars[indices[0]].style.backgroundColor = '#facc15'; // Yellow-400 for pivot
+            }
+
+            // If it's a swap, update heights
+            if (type === 'swap' && indices.length === 2) {
+                const tempHeight = bars[indices[0]].style.height;
+                bars[indices[0]].style.height = bars[indices[1]].style.height;
+                bars[indices[1]].style.height = tempHeight;
+            }
+
+            await delay(sortSpeed); // Pause for visualization
+        }
+
+        /**
+         * Sets all bars to 'sorted' color at the end of the algorithm.
+         */
+        async function markAllSorted() {
+            const bars = visualizationArea.children;
+            for (let i = 0; i < bars.length; i++) {
+                if (stopRequested) return; // Allow stopping even during final marking
+                bars[i].classList.remove('highlight');
+                bars[i].classList.add('sorted');
+                await delay(sortSpeed / 2); // Faster delay for final color transition
+            }
+        }
+
+        /**
+         * Resets UI controls and flags after sorting completes or is stopped.
+         */
+        function resetControls() {
+            isSorting = false;
+            stopRequested = false;
+            generateArrayBtn.disabled = false;
+            startSortBtn.disabled = false;
+            algorithmSelect.disabled = false;
+            arraySizeSlider.disabled = false;
+            sortSpeedSlider.disabled = false;
+            stopSortBtn.disabled = true; // Disable stop button again
+        }
+
+        // --- Sorting Algorithms ---
+
+        /**
+         * Bubble Sort Algorithm
+         * Compares adjacent elements and swaps them if they are in the wrong order.
+         */
+        async function bubbleSort() {
+            const n = array.length;
+            for (let i = 0; i < n - 1; i++) {
+                if (stopRequested) return;
+                for (let j = 0; j < n - i - 1; j++) {
+                    if (stopRequested) return;
+                    await updateBars([j, j + 1], 'compare'); // Highlight compared elements
+                    if (array[j] > array[j + 1]) {
+                        // Swap elements in the array
+                        [array[j], array[j + 1]] = [array[j + 1], array[j]];
+                        await updateBars([j, j + 1], 'swap'); // Highlight swapped elements
+                    }
+                }
+                await updateBars([n - 1 - i], 'sorted'); // Mark the largest element as sorted
+            }
+            await markAllSorted(); // Mark all bars as sorted at the end
+        }
+
+        /**
+         * Selection Sort Algorithm
+         * Finds the minimum element from the unsorted part and puts it at the beginning.
+         */
+        async function selectionSort() {
+            const n = array.length;
+            for (let i = 0; i < n - 1; i++) {
+                if (stopRequested) return;
+                let min_idx = i;
+                for (let j = i + 1; j < n; j++) {
+                    if (stopRequested) return;
+                    await updateBars([min_idx, j], 'compare'); // Highlight current min and element being compared
+                    if (array[j] < array[min_idx]) {
+                        min_idx = j;
+                    }
+                }
+                if (min_idx !== i) {
+                    // Swap elements
+                    [array[i], array[min_idx]] = [array[min_idx], array[i]];
+                    await updateBars([i, min_idx], 'swap'); // Highlight swapped elements
+                }
+                await updateBars([i], 'sorted'); // Mark the current element as sorted
+            }
+            await markAllSorted(); // Mark all bars as sorted at the end
+        }
+
+        /**
+         * Insertion Sort Algorithm
+         * Builds the final sorted array (or list) one item at a time.
+         */
+        async function insertionSort() {
+            const n = array.length;
+            for (let i = 1; i < n; i++) {
+                if (stopRequested) return;
+                let key = array[i];
+                let j = i - 1;
+
+                // Move elements of array[0..i-1], that are greater than key, to one position ahead of their current position
+                while (j >= 0 && array[j] > key) {
+                    if (stopRequested) return;
+                    await updateBars([j, j + 1], 'compare'); // Highlight elements being compared
+                    array[j + 1] = array[j];
+                    await updateBars([j, j + 1], 'swap'); // Simulate shift by swapping visually
+                    j = j - 1;
+                }
+                array[j + 1] = key;
+                await updateBars([j + 1], 'sorted'); // Visually "place" the element (though it might shift later)
+            }
+            await markAllSorted(); // Mark all bars as sorted at the end
+        }
+
+        /**
+         * Merge Sort Algorithm (Recursive helper function)
+         */
+        async function mergeSortHelper(arr, l, r) {
+            if (stopRequested) return;
+            if (l >= r) {
+                return; // Base case: array with 0 or 1 element is already sorted
+            }
+            const m = l + Math.floor((r - l) / 2);
+            await mergeSortHelper(arr, l, m);
+            if (stopRequested) return; // Check after recursive call
+            await mergeSortHelper(arr, m + 1, r);
+            if (stopRequested) return; // Check after recursive call
+            await merge(arr, l, m, r);
+        }
+
+        /**
+         * Merge function for Merge Sort
+         */
+        async function merge(arr, l, m, r) {
+            if (stopRequested) return;
+            const n1 = m - l + 1;
+            const n2 = r - m;
+
+            // Create temp arrays
+            const L = new Array(n1);
+            const R = new Array(n2);
+
+            // Copy data to temp arrays L[] and R[]
+            for (let i = 0; i < n1; i++) {
+                if (stopRequested) return;
+                L[i] = arr[l + i];
+            }
+            for (let j = 0; j < n2; j++) {
+                if (stopRequested) return;
+                R[j] = arr[m + 1 + j];
+            }
+
+            // Merge the temp arrays back into arr[l..r]
+            let i = 0; // Initial index of first sub-array
+            let j = 0; // Initial index of second sub-array
+            let k = l; // Initial index of merged sub-array
+
+            while (i < n1 && j < n2) {
+                if (stopRequested) return;
+                await updateBars([k, l + i, m + 1 + j], 'compare'); // Highlight elements being considered
+                if (L[i] <= R[j]) {
+                    arr[k] = L[i];
+                    await updateBars([k], 'swap'); // Show placement
+                    i++;
+                } else {
+                    arr[k] = R[j];
+                    await updateBars([k], 'swap'); // Show placement
+                    j++;
+                }
+                k++;
+            }
+
+            // Copy the remaining elements of L[], if there are any
+            while (i < n1) {
+                if (stopRequested) return;
+                await updateBars([k, l + i], 'compare');
+                arr[k] = L[i];
+                await updateBars([k], 'swap');
+                i++;
+                k++;
+            }
+
+            // Copy the remaining elements of R[], if there are any
+            while (j < n2) {
+                if (stopRequested) return;
+                await updateBars([k, m + 1 + j], 'compare');
+                arr[k] = R[j];
+                await updateBars([k], 'swap');
+                j++;
+                k++;
+            }
+
+            // Update the visual bars after merging a segment
+            const bars = visualizationArea.children;
+            for (let idx = l; idx <= r; idx++) {
+                if (stopRequested) return;
+                bars[idx].style.height = `${array[idx] * 0.8}%`;
+                bars[idx].classList.remove('highlight');
+            }
+            await delay(sortSpeed);
+        }
+
+        /**
+         * Quick Sort Algorithm (Recursive helper function)
+         */
+        async function quickSortHelper(arr, low, high) {
+            if (stopRequested) return;
+            if (low < high) {
+                const pi = await partition(arr, low, high);
+                if (stopRequested) return;
+                await quickSortHelper(arr, low, pi - 1);
+                if (stopRequested) return;
+                await quickSortHelper(arr, pi + 1, high);
+            }
+            if (low >= 0 && low < array.length) {
+                if (stopRequested) return;
+                 await updateBars([low], 'sorted'); // Mark single elements as sorted after partitioning
+            }
+             if (high >= 0 && high < array.length) {
+                if (stopRequested) return;
+                 await updateBars([high], 'sorted');
+             }
+        }
+
+        /**
+         * Partition function for Quick Sort
+         */
+        async function partition(arr, low, high) {
+            if (stopRequested) return low; // Return an arbitrary value if stopped
+            const pivot = arr[high]; // Choose the last element as the pivot
+            await updateBars([high], 'pivot'); // Highlight pivot
+            let i = (low - 1); // Index of smaller element
+
+            for (let j = low; j <= high - 1; j++) {
+                if (stopRequested) return low;
+                await updateBars([j], 'compare'); // Highlight element being compared with pivot
+                // If current element is smaller than or equal to pivot
+                if (arr[j] <= pivot) {
+                    i++;
+                    // swap arr[i] and arr[j]
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                    await updateBars([i, j], 'swap'); // Highlight swap
+                }
+            }
+            // swap arr[i + 1] and arr[high] (or pivot)
+            [arr[i + 1], arr[high]] = [arr[high], arr[i + 1]];
+            await updateBars([i + 1, high], 'swap'); // Highlight final pivot placement
+
+            return (i + 1);
+        }
+
+        // --- Event Listeners ---
+
+        generateArrayBtn.addEventListener('click', () => {
+            if (!isSorting) {
+                generateNewArray();
+            }
+        });
+
+        startSortBtn.addEventListener('click', async () => {
+            if (isSorting) {
+                console.log("Sorting in progress, please wait.");
+                return;
+            }
+
+            isSorting = true;
+            stopRequested = false; // Reset stop flag
+            generateArrayBtn.disabled = true; // Disable controls during sort
+            startSortBtn.disabled = true;
+            algorithmSelect.disabled = true;
+            arraySizeSlider.disabled = true;
+            sortSpeedSlider.disabled = true;
+            stopSortBtn.disabled = false; // Enable stop button
+
+            const selectedAlgorithm = algorithmSelect.value;
+            try {
+                switch (selectedAlgorithm) {
+                    case 'bubbleSort':
+                        await bubbleSort();
+                        break;
+                    case 'selectionSort':
+                        await selectionSort();
+                        break;
+                    case 'insertionSort':
+                        await insertionSort();
+                        break;
+                    case 'mergeSort':
+                        await mergeSortHelper(array, 0, array.length - 1);
+                        if (!stopRequested) await markAllSorted(); // Only mark sorted if not stopped
+                        break;
+                    case 'quickSort':
+                        await quickSortHelper(array, 0, array.length - 1);
+                        if (!stopRequested) await markAllSorted(); // Only mark sorted if not stopped
+                        break;
+                    default:
+                        console.error("Unknown algorithm selected.");
+                }
+            } catch (error) {
+                if (error.message === "Sorting stopped by user.") {
+                    console.log("Sorting halted.");
+                    // Keep the current state of the array visualization
+                } else {
+                    console.error("An error occurred during sorting:", error);
+                }
+            } finally {
+                resetControls(); // Always reset controls, whether finished or stopped
+                if (!stopRequested) {
+                    console.log("Sorting complete!");
+                }
+                // When sorting is complete or stopped, reset all bar colors to default
+                const bars = visualizationArea.children;
+                for (let i = 0; i < bars.length; i++) {
+                    bars[i].classList.remove('highlight', 'sorted', 'bg-yellow-400');
+                    bars[i].style.backgroundColor = '#3b82f6'; // Ensure they return to blue-500
+                }
+            }
+        });
+
+        stopSortBtn.addEventListener('click', () => {
+            stopRequested = true; // Set the flag to stop the ongoing sort
+            console.log("Stop requested. Finishing current operation...");
+        });
+
+        arraySizeSlider.addEventListener('input', (e) => {
+            arraySize = parseInt(e.target.value);
+            arraySizeValueSpan.textContent = arraySize;
+            if (!isSorting) { // Only generate new array if not sorting
+                generateNewArray();
+            }
+        });
+
+        sortSpeedSlider.addEventListener('input', (e) => {
+            sortSpeed = parseInt(e.target.value);
+            sortSpeedValueSpan.textContent = sortSpeed;
+        });
+
+        // Initial setup
+        window.onload = () => {
+            generateNewArray(); // Generate an array on page load
+            stopSortBtn.disabled = true; // Ensure stop button is disabled initially
+        };
+    </script>
+</body>
+</html>
