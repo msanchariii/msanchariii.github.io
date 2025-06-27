@@ -1,9 +1,11 @@
 "use client";
 import { useGSAP } from "@gsap/react";
-import Nav from "./Nav";
+// import Nav from "./Nav";
 import gsap from "gsap";
 import { SplitText } from "gsap/all";
 import Image from "next/image";
+import Header from "./Header";
+import Nav from "./Nav";
 
 gsap.registerPlugin(SplitText);
 
@@ -56,7 +58,7 @@ function Hero() {
     return (
         <section id="hero">
             <div className="container mx-auto w-full px-4">
-                <Nav />
+                <Header />
 
                 <div className="flex flex-col justify-center text-center">
                     <div className="mb-8 flex justify-center">
